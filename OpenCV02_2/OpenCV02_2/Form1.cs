@@ -1,17 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
+using System.Windows.Forms;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
-using System.Threading;
+using System.Text;
 
 namespace OpenCV02_2
 {
@@ -23,75 +18,124 @@ namespace OpenCV02_2
     public partial class Form1 : Form
     {
         private UdpClient client;
+        private const int PORT = 9050;
         private IPEndPoint serverEP;
-        private List<byte> imageDataList = new List<byte>();
+        private Mat frame;
+        private int totalFrameSize = 0;
+        private byte[] receivedImageData;
 
         public Form1()
         {
             InitializeComponent();
+            client = new UdpClient(9051);
+            serverEP = new IPEndPoint(IPAddress.Parse("192.168.56.1"), 9052);
         }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                serverEP = new IPEndPoint(IPAddress.Parse("192.168.56.1"), 9050);
-                client = new UdpClient(serverEP);
-                ReceiveAndDisplayVideo();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("에러 : " + ex.Message);
-                Console.WriteLine(ex.StackTrace);
-            }
-        }
+        // private Mat frame = null;
 
-        private object imageDataListLock = new object();
-
-        private void ReceiveAndDisplayVideo()
+        private void ReceiveFrames()
         {
             try
             {
                 while (true)
                 {
-                    byte[] receivedData = client.Receive(ref serverEP);
-                    /*lock (imageDataList) // 데이터에 대한 접근을 동기화합니다.
+                    byte[] imageData = client.Receive(ref serverEP);
+
+
+                    if (imageData.Length > 0)
                     {
-                        imageDataList.AddRange(receivedData);
-
-                        // 이미지의 마지막 부분인지 확인
-                        if (receivedData[receivedData.Length - 1] == (byte)DataPacketType.IMAGE_END)
+                        if (imageData[imageData.Length - 1] == (byte)DataPacketType.IMAGE_END)
                         {
-                            byte[] imageDataArray = new byte[imageDataList.Count]; // 새로운 배열 생성
-                            imageDataList.CopyTo(imageDataArray); // 데이터 복사
-
-                            ThreadPool.QueueUserWorkItem((state) =>
-                            {
-                                DisplayImage(imageDataArray); // 새 배열 전달
-                                lock (imageDataList) // 데이터에 대한 접근을 동기화합니다.
-                                {
-                                    imageDataList.Clear();
-                                }
-                            });
+                            // 이미지의 끝을 나타내는 마커를 제거하고 프레임을 출력
+                            Array.Resize(ref imageData, imageData.Length - 1);
+                            ProcessReceivedFrame(imageData);
                         }
-                    }*/
+                        else
+                        {
+                            // 받은 이미지 데이터를 임시 배열에 추가
+                            ProcessReceivedFrame(imageData);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                Console.WriteLine("Error : " + ex.Message);
+            }
+            finally
+            {
+                client.Close();
+            }
+        }
+
+        private void ProcessReceivedFrame(byte[] imageData)
+        {
+            if (receivedImageData == null)
+            {
+                // 첫 번째 패킷을 받았을 때 프레임의 전체 크기를 확인하고 임시 배열 초기화
+                totalFrameSize = BitConverter.ToInt32(imageData, 0);
+
+                receivedImageData = new byte[totalFrameSize];
+                Array.Copy(imageData, 4, receivedImageData, 0, imageData.Length - 4);
+            }
+            else
+            {
+                // 이후 패킷을 받을 때마다 임시 배열에 데이터 추가
+                int offset = BitConverter.ToInt32(imageData, 0);
+                Array.Copy(imageData, 4, receivedImageData, offset, imageData.Length - 4);
+            }
+
+
+            
+
+            // 전체 프레임을 받았을 때 Mat 형식으로 변환하여 출력
+            if (receivedImageData.Length >= totalFrameSize)
+            {
+
+                Console.WriteLine(Encoding.UTF8.GetString(receivedImageData));
+
+
+
+                // JPEG 형식으로 디코딩하고 Mat으로 로드
+                Mat decodedFrame = Cv2.ImDecode(receivedImageData, ImreadModes.Color);
+
+                // 이미지 출력
+                if (decodedFrame != null && decodedFrame.Width > 0 && decodedFrame.Height > 0)
+                {
+                    frame = decodedFrame;
+                    Console.WriteLine(Encoding.UTF8.GetString(decodedFrame.ToBytes()));
+
+                    // UI 스레드를 통해 PictureBox에 이미지 출력
+                    BeginInvoke(new Action(() =>
+                    {
+
+                        ;
+                        pictureBox2.Image = BitmapConverter.ToBitmap(frame);
+                    }));
+                }
+                else
+                {
+                    //MessageBox.Show("유효하지 않은 이미지입니다.");
+                }
+
+                // 임시 배열 초기화
+                receivedImageData = null;
             }
         }
 
 
 
-
-
-        private void DisplayImage(byte[] imageData)
+        private void button1_Click(object sender, EventArgs e)
         {
-            Mat receivedFrame = Mat.FromImageData(imageData);
-            Bitmap bitmap = BitmapConverter.ToBitmap(receivedFrame);
-            pictureBox2.Image = bitmap;
+            // 동영상 프레임 수신을 담당하는 스레드 시작
+            Thread receiveThread = new Thread(ReceiveFrames);
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            client.Close();
         }
     }
 }
