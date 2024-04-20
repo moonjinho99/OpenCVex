@@ -39,9 +39,10 @@ namespace OpenCV02_2
             // 
             // pictureBox2
             // 
-            this.pictureBox2.Location = new System.Drawing.Point(685, 99);
+            this.pictureBox2.Location = new System.Drawing.Point(126, 102);
+            this.pictureBox2.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.pictureBox2.Name = "pictureBox2";
-            this.pictureBox2.Size = new System.Drawing.Size(942, 743);
+            this.pictureBox2.Size = new System.Drawing.Size(837, 557);
             this.pictureBox2.TabIndex = 1;
             this.pictureBox2.TabStop = false;
             // 
@@ -49,18 +50,19 @@ namespace OpenCV02_2
             // 
             this.label2.AutoSize = true;
             this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 20F);
-            this.label2.Location = new System.Drawing.Point(1053, 39);
+            this.label2.Location = new System.Drawing.Point(410, 46);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(273, 46);
+            this.label2.Size = new System.Drawing.Size(210, 39);
             this.label2.TabIndex = 3;
             this.label2.Text = "다른 사용자 화면";
             // 
             // button1
             // 
             this.button1.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F);
-            this.button1.Location = new System.Drawing.Point(846, 934);
+            this.button1.Location = new System.Drawing.Point(256, 676);
+            this.button1.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(683, 144);
+            this.button1.Size = new System.Drawing.Size(607, 108);
             this.button1.TabIndex = 4;
             this.button1.Text = "시작하기";
             this.button1.UseVisualStyleBackColor = true;
@@ -68,14 +70,16 @@ namespace OpenCV02_2
             // 
             // Form1
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(2457, 1197);
+            this.ClientSize = new System.Drawing.Size(1145, 806);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.pictureBox2);
+            this.Margin = new System.Windows.Forms.Padding(3, 2, 3, 2);
             this.Name = "Form1";
             this.Text = "Form1";
+            this.Load += new System.EventHandler(this.Form1_Load);
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();

@@ -11,98 +11,79 @@ using OpenCvSharp;
 using OpenCvSharp.Extensions;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 
 namespace OpenCVEx02
 {
 
-    public enum DataPacketType
-    {
-        IMAGE_END
-    }
-
     public partial class Form1 : Form
     {
-        private UdpClient client;
-        private IPEndPoint serverEP;
-        private VideoCapture capture;
+        private const int FrameWidth = 640;
+        private const int FrameHeight = 480;
+        private const int ChunkSize = 1024;
+
+        private VideoCapture _capture;
+
 
         public Form1()
         {
             InitializeComponent();
+
         }
 
         private void startBtn_Click(object sender, EventArgs e)
         {
-            client = new UdpClient(9052);
-            serverEP = new IPEndPoint(IPAddress.Parse("192.168.56.1"), 9051);
-            capture = new VideoCapture(0);
 
-            timer1.Start();
+            _capture = new VideoCapture(0); // 내장 카메라 사용
+            _capture.FrameWidth = FrameWidth;
+            _capture.FrameHeight = FrameHeight;
+
+            // 송신 시작
+            Thread senderThread = new Thread(SendVideo);
+            senderThread.IsBackground = true;
+            senderThread.Start();
         }
 
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-            using (Mat frame = new Mat())
-            {
-                capture.Read(frame);
-                if(!frame.Empty())
-                {
-                    SendVideo(frame);
-                    pictureBox1.Image = BitmapConverter.ToBitmap(frame);
-                    //Console.WriteLine("이미지 데이터 : " + frame);
-                }
-            }
-        }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            capture.Release();
+            _capture.Release();
         }
 
-
-        /* private void SendVideo(Mat frame)
-         {
-             int ChunkSize = 1024;
-
-             try
-             {
-                 byte[] imageData = frame.ToBytes(".jpg");
-
-                 client.Send(imageData, imageData.Length, serverEP);
-             } catch(Exception ex)
-             {
-                 MessageBox.Show(ex.Message);
-             }
-
-         }*/
-
-
-        private void SendVideo(Mat frame)
+        private void SendVideo()
         {
-            int chunkSize = 1024; // 조각의 크기
-            byte[] imageData = frame.ToBytes(".jpg"); // 전체 이미지 데이터
-
-            // 전체 이미지 데이터의 크기
-            int totalSize = imageData.Length;
-       
-            // 추가 정보와 함께 이미지 데이터를 조각으로 나누어 전송
-            for (int offset = 0; offset < totalSize; offset += chunkSize)
+            using (Socket senderSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
             {
-                int size = Math.Min(chunkSize, totalSize - offset); // 나눌 조각의 크기
-                byte[] chunkData = new byte[size + 8]; // 8바이트 추가 정보를 위한 공간 확보
-                Array.Copy(BitConverter.GetBytes(totalSize), chunkData, 4); // 전체 프레임 크기 추가
-                Array.Copy(BitConverter.GetBytes(offset), 0, chunkData, 4, 4); // 현재 조각의 오프셋 추가
-                Array.Copy(imageData, offset, chunkData, 8, size); // 조각 데이터 복사
+                senderSocket.Connect(IPAddress.Parse("192.168.50.223"), 9050); 
 
-                // TODO: chunkData를 전송
-                try
+                Mat frame = new Mat();
+                byte[] buffer;
+
+                while (true)
                 {
-                    client.Send(chunkData, chunkData.Length, serverEP);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
+                    _capture.Read(frame);
+
+                    if (!frame.Empty())
+                    {
+
+                        pictureBox1.Image = BitmapConverter.ToBitmap(frame);
+
+                        // 이미지를 JPEG 형식으로 인코딩하여 바이트 배열로 변환
+                        buffer = frame.ToBytes(".jpg");
+
+                        // 전체 데이터 크기 전송
+                        senderSocket.Send(BitConverter.GetBytes(buffer.Length));
+
+                        // 데이터를 조각으로 나누어 전송
+                        for (int i = 0; i < buffer.Length; i += ChunkSize)
+                        {
+                            int size = Math.Min(ChunkSize, buffer.Length - i);
+                            senderSocket.Send(buffer, i, size, SocketFlags.None);
+                        }
+                    }
+
+                    Thread.Sleep(30); // 잠시 대기 후 다음 프레임 처리
                 }
             }
         }
